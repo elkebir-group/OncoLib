@@ -131,7 +131,7 @@ bool MutCloneTree::readLeafLabeling(std::istream& in)
     _b[u].clear();
     for (int c = 0; c < nrCharacters; ++c)
     {
-      _b[u].insert(boost::lexical_cast<int>(s[3 + nrSamples + c]));
+      _b[u].insert(s[3 + nrSamples + c]);
     }
   }
   
@@ -156,7 +156,7 @@ void MutCloneTree::writeLeafLabeling(std::ostream& out) const
     {
       out << " " << proportion;
     }
-    for (int c : _b[u])
+    for (const std::string& c : _b[u])
     {
       out << " " << c;
     }
@@ -280,16 +280,15 @@ FrequencyMatrix MutCloneTree::getFrequencies() const
   StringVector indexToSample;
   StringVector indexToCharacter;
   
-  IntSet characters;
+  StringSet characters;
   for (Node u : leafSet())
   {
     characters.insert(getMutations(u).begin(), getMutations(u).end());
   }
   
-  for (int i : characters)
+  for (const std::string& i : characters)
   {
-    snprintf(buf, 1024, "%d", i);
-    indexToCharacter.push_back(buf);
+    indexToCharacter.push_back(i);
   }
   
   StringSet locationSet = getLocations();
@@ -323,9 +322,8 @@ FrequencyMatrix MutCloneTree::getFrequencies() const
   FrequencyMatrix F(indexToLocation, indexToSample, indexToCharacter,
                     sampleIndexToLocationIndex);
   
-  for (int i : characters)
+  for (const std::string& i : characters)
   {
-    snprintf(buf, 1024, "%d", i);
     const int c = F.characterToIndex(buf);
     
     for (Node u : leafSet())

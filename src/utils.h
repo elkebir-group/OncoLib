@@ -68,6 +68,7 @@ typedef std::list<std::string> StringList;
 typedef std::set<std::string> StringSet;
 typedef std::pair<std::string, std::string> StringPair;
 typedef std::list<StringPair> StringPairList;
+typedef Digraph::NodeMap<StringSet> StringSetNodeMap;
 typedef Digraph::NodeMap<StringList> StringListNodeMap;
 typedef Digraph::NodeMap<BoolVector> BoolVectorNodeMap;
 typedef Digraph::NodeMap<IntVector> IntVectorNodeMap;

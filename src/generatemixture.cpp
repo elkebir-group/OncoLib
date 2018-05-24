@@ -21,15 +21,15 @@ MutCloneTree GenerateMixture::generate(const int k) const
   IntVector sampleToLocationVector;
   
   /// 1. Partition leaf set by locations and mutations
-  IntToIntMap mutationMap;
+  StringToIntMap mutationMap;
   StringToNodeSetMap leavesByLocation;
-  IntToNodeSetMap leavesByMutation;
+  StringToNodeSetMap leavesByMutation;
   for (Node v : _T.leafSet())
   {
     const std::string& s = _T.l(v);
     
     leavesByLocation[s].insert(v);
-    for (int j : _T.getMutations(v))
+    for (const std::string& j : _T.getMutations(v))
     {
       if (leavesByMutation.count(j) == 0)
       {
@@ -46,16 +46,14 @@ MutCloneTree GenerateMixture::generate(const int k) const
   }
   
   /// 2. Sample
-  char buf[1024];
   const int nrMutations = leavesByMutation.size();
   mutationVector = StringVector(nrMutations);
-  for (const IntPair& pair : mutationMap)
+  for (const auto& pair : mutationMap)
   {
-    int i = pair.first;
+    const std::string& i = pair.first;
     int mapped_i = pair.second;
-    
-    snprintf(buf, 1024, "%d", i);
-    mutationVector[mapped_i] = buf;
+
+    mutationVector[mapped_i] = i;
   }
   
   DoubleVectorNodeMap sampleProportions(_T.tree(), DoubleVector(k, 0));
@@ -132,7 +130,7 @@ MutCloneTree GenerateMixture::constructCloneTree(const NodeSet& sampledLeaves,
   /// the Node type of the source digraph.
   NodeNodeMap ref(newT);
   
-  IntSetNodeMap newMutationMap(newT);
+  StringSetNodeMap newMutationMap(newT);
   lemon::digraphCopy(subT, newT)
     .node(_T.root(), newRoot)
     .nodeMap(_T.getIdMap(), label)
@@ -141,7 +139,7 @@ MutCloneTree GenerateMixture::constructCloneTree(const NodeSet& sampledLeaves,
     .nodeCrossRef(ref)
     .run();
   
-  std::map<std::string, IntSet> labelToMutations;
+  std::map<std::string, StringSet> labelToMutations;
   for (NodeIt v(newT); v != lemon::INVALID; ++v)
   {
     if (OutArcIt(newT, v) == lemon::INVALID)

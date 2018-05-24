@@ -1230,6 +1230,8 @@ void Simulation::constructCloneTree()
   delete _pSampleProportions;
   delete _pCloneT;
   
+  char buf[1024];
+  
   _pCloneT = new MutCloneTree(newT, newRoot, label, anatomicalSiteStr);
   _pAnatomicalSiteProportions = new DoubleNodeMap(_pCloneT->tree(), 0);
   _pSampleProportions = new DoubleVectorNodeMap(_pCloneT->tree(), DoubleVector(_nrSamplesPerAnatomicalSite, 0));
@@ -1247,7 +1249,11 @@ void Simulation::constructCloneTree()
       _pCloneT->setMixtureProportions(v, U_v);
       _pAnatomicalSiteProportions->set(v, cloneFrequency[vv]);
       _pAnatomicalSite->set(v, anatomicalSiteMap[leafToTaxa[vv]]);
-      _pCloneT->setMutations(v, (*_pMutations)[v]);
+      for (int i : (*_pMutations)[v])
+      {
+        snprintf(buf, 1024, "%d", i);
+        _pCloneT->addMutation(v, buf);
+      }
     }
   }
 }
@@ -1774,7 +1780,12 @@ bool Simulation::constructSampledCloneTree()
       _pCloneTT->setMixtureProportions(v, (*_pSampleProportions)[vv]);
       _pAnatomicalSiteTT->set(v, (*_pAnatomicalSite)[vv]);
       _pVertexLabelingTT->set(v, _anatomicalSiteLabel[(*_pAnatomicalSite)[vv]]);
-      _pCloneTT->setMutations(v, (*_pMutationsTT)[v]);
+      
+      for (int i : (*_pMutationsTT)[v])
+      {
+        snprintf(buf, 1024, "%d", i);
+        _pCloneTT->addMutation(v, buf);
+      }
     }
     else if (labelToAnatomicalSite.count(label_v) == 1)
     {

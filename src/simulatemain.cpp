@@ -44,7 +44,7 @@ int main(int argc, char** argv)
     .refOption("mig", "Migration rate (default: 1e-6)", migrationRate)
     .refOption("mut", "Mutation rate (default: 0.1)", mutationRate)
     .refOption("N", "Number of successful simulations (default: -1)", N)
-    .refOption("m", "Maximum number of detectable anatomical sites (default: 8)", maxNrAnatomicalSites)
+    .refOption("m", "Maximum number of detectable anatomical sites (default: 3)", maxNrAnatomicalSites)
     .refOption("p", "Allowed migration patterns:\n"\
                "       0 : mS (default)\n"\
                "       1 : mS, S\n" \

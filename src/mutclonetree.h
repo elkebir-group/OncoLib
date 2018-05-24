@@ -68,7 +68,7 @@ public:
   ///
   /// @param u Leaf
   /// @param c Character
-  bool hasMutation(Node u, int c) const
+  bool hasMutation(Node u, const std::string& c) const
   {
     return _b[u].count(c) == 1;
   }
@@ -76,13 +76,13 @@ public:
   /// Return mutations
   ///
   /// @param u Leaf
-  const IntSet& getMutations(Node u) const
+  const StringSet& getMutations(Node u) const
   {
     return _b[u];
   }
   
   /// Return mutations node map
-  const IntSetNodeMap& getMutationsNodeMap() const
+  const StringSetNodeMap& getMutationsNodeMap() const
   {
     return _b;
   }
@@ -91,7 +91,7 @@ public:
   ///
   /// @param u Leaf
   /// @param b Mutation set
-  void setMutations(Node u, const IntSet& b)
+  void setMutations(Node u, const StringSet& b)
   {
     _b[u] = b;
   }
@@ -100,7 +100,7 @@ public:
   ///
   /// @param u Leaf
   /// @param c Character
-  void addMutation(Node u, int c)
+  void addMutation(Node u, const std::string& c)
   {
     _b[u].insert(c);
   }
@@ -109,7 +109,7 @@ public:
   ///
   /// @param u Leaf
   /// @param c Character
-  void removeMutation(Node u, int c)
+  void removeMutation(Node u, const std::string& c)
   {
     _b[u].erase(c);
   }
@@ -148,7 +148,7 @@ protected:
   /// Mixture proportion in location L(T) -> [0,1]^k
   DoubleVectorNodeMap _U;
   /// Mutation vector L(T) -> {0,1}^n
-  IntSetNodeMap _b;
+  StringSetNodeMap _b;
 };
 
 #endif // MUTCLONETREE_H
