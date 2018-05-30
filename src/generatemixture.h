@@ -23,7 +23,9 @@ public:
   /// Generate mixture
   ///
   /// @param k Number of samples per location
-  MutCloneTree generate(const int k) const;
+  /// @param partition Indicates whether clones per location should simply be paritioned.
+  MutCloneTree generate(int k,
+                        bool partition) const;
   
 private:
   typedef std::map<std::string, NodeSet> StringToNodeSetMap;

@@ -324,7 +324,7 @@ FrequencyMatrix MutCloneTree::getFrequencies() const
   
   for (const std::string& i : characters)
   {
-    const int c = F.characterToIndex(buf);
+    const int c = F.characterToIndex(i);
     
     for (Node u : leafSet())
     {

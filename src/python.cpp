@@ -234,6 +234,7 @@ std::string visualizeCloneTree(std::string filenameInTree,
 void mix(const std::string& filenameInTree,
          const std::string& filenameOutTree,
          int k,
+         bool partition,
          int seed = 0)
 {
   std::ifstream inT(filenameInTree.c_str());
@@ -246,7 +247,7 @@ void mix(const std::string& filenameInTree,
   inT >> T;
 
   g_rng = std::mt19937(seed);
-  MutCloneTree sampledT = GenerateMixture(T).generate(k);
+  MutCloneTree sampledT = GenerateMixture(T).generate(k, partition);
   
   std::ofstream outT(filenameOutTree.c_str());
   outT << sampledT;
@@ -351,7 +352,7 @@ BOOST_PYTHON_FUNCTION_OVERLOADS(visualizeMigrationGraph_overloads, visualizeMigr
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(simulate_overloads, simulate, 0, 2);
 
-BOOST_PYTHON_FUNCTION_OVERLOADS(mix_overloads, mix, 3, 4);
+BOOST_PYTHON_FUNCTION_OVERLOADS(mix_overloads, mix, 4, 5);
 
 BOOST_PYTHON_MODULE(oncosim)
 {
@@ -409,6 +410,7 @@ BOOST_PYTHON_MODULE(oncosim)
   p::def("mix", mix, mix_overloads(p::args("filenameInTree",
                                            "filenameOutTree",
                                            "k",
+                                           "partition",
                                            "seed=0"),
                                    "Generate mixture of clone tree leaves"));
   

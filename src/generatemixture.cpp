@@ -12,7 +12,8 @@ GenerateMixture::GenerateMixture(const MutCloneTree& T)
 {
 }
 
-MutCloneTree GenerateMixture::generate(const int k) const
+MutCloneTree GenerateMixture::generate(int k,
+                                       bool partition) const
 {
   const int m = _T.getNrLocations();
   StringSet locationSet = _T.getLocations();
@@ -58,47 +59,83 @@ MutCloneTree GenerateMixture::generate(const int k) const
   
   DoubleVectorNodeMap sampleProportions(_T.tree(), DoubleVector(k, 0));
   
-  NodeSet sampledLeaves;
-  for (int s = 0; s < m; ++s)
+  if (partition)
   {
-    const std::string& loc_s = locationVector[s];
-    for (int p = 0; p < k; ++p)
+    IntNodeMap sampleIndexMap(_T.tree(), 0);
+    std::uniform_int_distribution<> unif_int(0, k - 1);
+    for (Node v : _T.leafSet())
     {
-      // simulate draw from Dirichlet by drawing from gamma distributions
-      // https://en.wikipedia.org/wiki/Dirichlet_distribution#Gamma_distribution
-      
-      DoubleNodeMap draw(_T.tree(), 0);
-      double sum = 0;
-      for (Node v : leavesByLocation[loc_s])
+      sampleIndexMap[v] = unif_int(g_rng);
+    }
+    
+    for (int s = 0; s < m; ++s)
+    {
+      const std::string& loc_s = locationVector[s];
+      for (int p = 0; p < k; ++p)
       {
-        std::gamma_distribution<> gamma_dist(_T.getMixtureProportions(v)[0] * 3, 1);
-        draw[v] = (gamma_dist(g_rng));
-        sum += draw[v];
-      }
-      
-      double new_sum = 0;
-      for (Node v : leavesByLocation[loc_s])
-      {
-        if ((draw[v] / sum) >= 0.1)
+        double sum = 0;
+        for (Node v : leavesByLocation[loc_s])
         {
-          sampleProportions[v][p] = draw[v];
-          new_sum += draw[v];
-          sampledLeaves.insert(v);
+          if (sampleIndexMap[v] == p)
+          {
+            sum += _T.getMixtureProportions(v)[0];
+          }
         }
-        else
+        
+        for (Node v : leavesByLocation[loc_s])
         {
-          sampleProportions[v][p] = 0;
+          if (sampleIndexMap[v] == p)
+          {
+            sampleProportions[v][p] = _T.getMixtureProportions(v)[0] / sum;
+          }
         }
-      }
-      
-      for (Node v : leavesByLocation[loc_s])
-      {
-        sampleProportions[v][p] /= new_sum;
       }
     }
+    return constructCloneTree(_T.leafSet(), sampleProportions);
   }
-  
-  return constructCloneTree(sampledLeaves, sampleProportions);
+  else
+  {
+    NodeSet sampledLeaves;
+    for (int s = 0; s < m; ++s)
+    {
+      const std::string& loc_s = locationVector[s];
+      for (int p = 0; p < k; ++p)
+      {
+        // simulate draw from Dirichlet by drawing from gamma distributions
+        // https://en.wikipedia.org/wiki/Dirichlet_distribution#Gamma_distribution
+        
+        DoubleNodeMap draw(_T.tree(), 0);
+        double sum = 0;
+        for (Node v : leavesByLocation[loc_s])
+        {
+          std::gamma_distribution<> gamma_dist(_T.getMixtureProportions(v)[0], 1);
+          draw[v] = (gamma_dist(g_rng));
+          sum += draw[v];
+        }
+        
+        double new_sum = 0;
+        for (Node v : leavesByLocation[loc_s])
+        {
+          if ((draw[v] / sum) >= 0.01)
+          {
+            sampleProportions[v][p] = draw[v];
+            new_sum += draw[v];
+            sampledLeaves.insert(v);
+          }
+          else
+          {
+            sampleProportions[v][p] = 0;
+          }
+        }
+        
+        for (Node v : leavesByLocation[loc_s])
+        {
+          sampleProportions[v][p] /= new_sum;
+        }
+      }
+    }
+    return constructCloneTree(sampledLeaves, sampleProportions);
+  }
 }
 
 MutCloneTree GenerateMixture::constructCloneTree(const NodeSet& sampledLeaves,

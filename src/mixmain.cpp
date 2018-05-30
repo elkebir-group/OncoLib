@@ -15,10 +15,12 @@ int main(int argc, char** argv)
 {
   int seed = 0;
   int nrSamplesPerAnatomicalSite = 0;
+  bool partition = false;
   
   lemon::ArgParser ap(argc, argv);
   ap.refOption("s", "Random number generator seed (default: 0)", seed, false)
     .refOption("k", "Number of samples per anatomical site", nrSamplesPerAnatomicalSite, true)
+    .refOption("p", "Partition leaf set", partition)
     .other("T", "Clone tree");
   ap.parse();
   
@@ -48,7 +50,7 @@ int main(int argc, char** argv)
   }
   
   g_rng = std::mt19937(seed);
-  MutCloneTree sampledT = GenerateMixture(T).generate(nrSamplesPerAnatomicalSite);
+  MutCloneTree sampledT = GenerateMixture(T).generate(nrSamplesPerAnatomicalSite, partition);
   
   std::cout << sampledT;
   
