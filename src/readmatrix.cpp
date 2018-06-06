@@ -108,6 +108,10 @@ FrequencyMatrix ReadMatrix::toFrequencyMatrix(double alpha,
       {
         f_lb = f_ub = 0;
       }
+      else if (ref == 0 && var > 0)
+      {
+        f_lb = f_ub = 1;
+      }
       
 //      f_lb *= 2;
 //      f_ub *= 2;
