@@ -21,6 +21,7 @@ int Simulation::run(const std::string& outputDirectory,
                     int maxNrAnatomicalSites,
                     int migrationPattern,
                     int maxNrTrials,
+                    int desiredNrMutationClusters,
                     int sequencingDepth,
                     int nrSamplesPerAnatomicalSite,
                     int nrSamplesPrimary,
@@ -99,7 +100,9 @@ int Simulation::run(const std::string& outputDirectory,
       if (simulation.simulate(verbose))
       {
         MigrationGraph GG = simulation.getObservedMigrationGraph();
-        if (success(GG, migPattern))
+        if (success(GG, migPattern) &&
+            (desiredNrMutationClusters == -1
+             || simulation.getNrMutationClusters() == desiredNrMutationClusters))
         {
           if (filenameColorMap.empty())
           {
@@ -187,11 +190,11 @@ void Simulation::output(const Simulation& simulation,
 
 bool Simulation::success(const MigrationGraph& G,
                          Simulation::Pattern pattern)
-{
+{ 
   switch (pattern)
   {
     case Simulation::PATTERN_mS:
-      return G.getNrMigrations() == G.getNrLocations() - 1;
+      return G.getNrMigrations() == G.getNrLocations() - 1 || G.getNrMigrations() == 0;
     case Simulation::PATTERN_S:
       return G.isPolyclonal() && G.isSingleSourceSeeded();
     case Simulation::PATTERN_M:
@@ -351,7 +354,7 @@ bool Simulation::simulateReadCounts()
       double sum = 0;
       for (Node v : leavesPerAnatomicalSite[s])
       {
-        std::gamma_distribution<> gamma_dist((*_pAnatomicalSiteProportions)[v]*3, 1);
+        std::gamma_distribution<> gamma_dist((*_pAnatomicalSiteProportions)[v]*100, 1);
         draw[v] = (gamma_dist(g_rng));
         sum += draw[v];
       }
@@ -359,7 +362,7 @@ bool Simulation::simulateReadCounts()
       double new_sum = 0;
       for (Node v : leavesPerAnatomicalSite[s])
       {
-        if ((draw[v] / sum) >= 0.1)
+        if ((draw[v] / sum) >= 0.01)
         {
           (*_pSampleProportions)[v][p] = draw[v];
           new_sum += draw[v];
@@ -456,7 +459,7 @@ void Simulation::writeReadCounts(std::ostream& out) const
 
   if (_nrSamplesPerAnatomicalSite == 0)
   {
-    out << " 1 #anatomical sites" << std::endl;
+    out << "1 #anatomical sites" << std::endl;
   }
   else
   {

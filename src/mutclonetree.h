@@ -139,10 +139,14 @@ public:
   /// @param sequencingErrorRate Nucleotide substition error rate
   /// @param purity Purity
   /// @param ploidy Ploidy
+  /// @param usePoisson Use Poisson distribution for coverage
+  /// @param useBinomial Use binomial distribution for variant read count
   ReadMatrix getReads(double purity,
                       int sequencingDepth,
                       double sequencingErrorRate,
-                      int ploidy) const;
+                      int ploidy,
+                      bool usePoisson,
+                      bool useBinomial) const;
   
 protected:
   /// Mixture proportion in location L(T) -> [0,1]^k

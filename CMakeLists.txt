@@ -1,6 +1,6 @@
 cmake_minimum_required( VERSION 3.0 )
 
-project( ONCOSIM VERSION 1.0 )
+project( ONCOLIB VERSION 1.0 )
 
 set( CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR} ${CMAKE_MODULE_PATH} )
 
@@ -17,6 +17,21 @@ set( python_mod_src
   src/readmatrix.cpp
   src/generatemixture.cpp
   src/frequencymatrix.cpp
+  src/enumeratemutationtrees.cpp
+  src/spruce/perfectphylograph.cpp
+  src/spruce/perfectphylomatrix.cpp
+  src/spruce/perfectphylotree.cpp
+  src/spruce/realmatrix.cpp
+  src/spruce/matrix.cpp
+  src/spruce/realtensor.cpp
+  src/spruce/rootedcladisticancestrygraph.cpp
+  src/spruce/rootedcladisticnoisyancestrygraph.cpp
+  src/spruce/rootedcladisticenumeration.cpp
+  src/spruce/rootedcladisticnoisyenumeration.cpp
+  src/spruce/solution.cpp
+  src/spruce/solutionset.cpp
+  src/spruce/statetree.cpp
+  src/spruce/tensor.cpp
 )
 
 set( python_mod_hdr
@@ -33,6 +48,18 @@ set( python_mod_hdr
   src/frequencymatrix.h
   src/generatemixture.h
   src/utils.h
+  src/enumeratemutationtrees.h
+  src/spruce/matrix.h
+  src/spruce/realmatrix.h
+  src/spruce/realtensor.h
+  src/spruce/rootedcladisticancestrygraph.h
+  src/spruce/rootedcladisticnoisyancestrygraph.h
+  src/spruce/rootedcladisticenumeration.h
+  src/spruce/rootedcladisticnoisyenumeration.h
+  src/spruce/solution.h
+  src/spruce/solutionset.h
+  src/spruce/statetree.h
+  src/spruce/tensor.h
 )
 
 set( sequence_hdr
@@ -201,6 +228,85 @@ set( reads2freqs_hdr
   src/utils.h
 )
 
+set( cluster_hdr
+  src/bronkerbosch.h
+  src/utils.h
+  src/basematrix.h
+  src/readmatrix.h
+  src/frequencymatrix.h
+  src/cluster/cluster.h
+)
+
+set( cluster_src
+  src/bronkerbosch.cpp
+  src/utils.cpp
+  src/basematrix.cpp
+  src/frequencymatrix.cpp
+  src/readmatrix.cpp
+  src/cluster/clustermain.cpp
+  src/cluster/cluster.cpp
+)
+
+set( precluster_hdr
+  src/utils.h
+  src/basematrix.h
+  src/frequencymatrix.h
+)
+
+set( precluster_src
+  src/cluster/preclustermain.cpp
+  src/utils.cpp
+  src/basematrix.cpp
+  src/frequencymatrix.cpp
+)
+
+set( enumerate_hdr
+  src/utils.h
+  src/basematrix.h
+  src/frequencymatrix.h
+  src/readmatrix.h
+  src/clonetree.h
+  src/mutclonetree.h
+  src/enumeratemutationtrees.h
+  src/spruce/matrix.h
+  src/spruce/realmatrix.h
+  src/spruce/realtensor.h
+  src/spruce/rootedcladisticancestrygraph.h
+  src/spruce/rootedcladisticnoisyancestrygraph.h
+  src/spruce/rootedcladisticenumeration.h
+  src/spruce/rootedcladisticnoisyenumeration.h
+  src/spruce/solution.h
+  src/spruce/solutionset.h
+  src/spruce/statetree.h
+  src/spruce/tensor.h
+)
+
+set( enumerate_src
+  src/enumeratemain.cpp
+  src/utils.cpp
+  src/basematrix.cpp
+  src/frequencymatrix.cpp
+  src/readmatrix.cpp
+  src/enumeratemutationtrees.cpp
+  src/basetree.cpp
+  src/clonetree.cpp
+  src/mutclonetree.cpp
+  src/spruce/perfectphylograph.cpp
+  src/spruce/perfectphylomatrix.cpp
+  src/spruce/perfectphylotree.cpp
+  src/spruce/realmatrix.cpp
+  src/spruce/matrix.cpp
+  src/spruce/realtensor.cpp
+  src/spruce/rootedcladisticancestrygraph.cpp
+  src/spruce/rootedcladisticnoisyancestrygraph.cpp
+  src/spruce/rootedcladisticenumeration.cpp
+  src/spruce/rootedcladisticnoisyenumeration.cpp
+  src/spruce/solution.cpp
+  src/spruce/solutionset.cpp
+  src/spruce/statetree.cpp
+  src/spruce/tensor.cpp
+)
+
 # first we can indicate the documentation build as an option and set it to ON by default
 option(BUILD_DOC "Build documentation" ON)
 
@@ -256,19 +362,20 @@ MESSAGE( STATUS "found boost:"
 
 FIND_PACKAGE(PythonInterp REQUIRED)
 FIND_PACKAGE(PythonLibsNew REQUIRED)
+find_package(Armadillo REQUIRED)
 
 # custom macro with most of the redundant code for making a python example module
 MACRO( addPythonExe _name _srccpp )
 ADD_EXECUTABLE(${_name} ${_srccpp} ${python_mod_src} ${python_mod_hdr} )
 # make the pyd library link against boost_numpy python and boost
-TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR})
+TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} ${ARMADILLO_INCLUDE_DIRS})
 TARGET_LINK_LIBRARIES(${_name} ${CommonLibs} boost_python2.7)
 ENDMACRO()
 
 MACRO( addPythonMod _name _srccpp )
 PYTHON_ADD_MODULE(${_name} ${_srccpp} ${python_mod_src} ${python_mod_hdr} )
 # make the pyd library link against boost_numpy python and boost
-TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR})
+TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} ${ARMADILLO_INCLUDE_DIRS})
 TARGET_LINK_LIBRARIES(${_name} ${CommonLibs})
 ENDMACRO()
 
@@ -280,6 +387,7 @@ set( CommonLibs
   emon
   pthread
   ${Boost_LIBRARIES}
+  ${ARMADILLO_LIBRARIES}
 )
 
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG" )
@@ -308,4 +416,13 @@ target_link_libraries( tree2dot ${CommonLibs} )
 add_executable( graph2dot ${graph2dot_src} ${graph2dot_hdr} )
 target_link_libraries( graph2dot ${CommonLibs} )
 
-addPythonMod( oncosim src/python.cpp )
+add_executable( cluster ${cluster_src} ${cluster_hdr} )
+target_link_libraries( cluster ${CommonLibs} )
+
+add_executable( enumerate ${enumerate_src} ${enumerate_hdr} )
+target_link_libraries( enumerate ${CommonLibs} )
+
+add_executable( precluster ${precluster_src} ${precluster_hdr} )
+target_link_libraries( precluster ${CommonLibs} )
+
+addPythonMod( oncolib src/python.cpp )

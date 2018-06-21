@@ -15,7 +15,9 @@ FrequencyMatrix::FrequencyMatrix()
 
 FrequencyMatrix::FrequencyMatrix(const BaseMatrix& other)
   : BaseMatrix(other)
-  , _f(DoublePairMatrix(_k, DoublePairVector(_n, std::make_pair(0., 0.))))
+  , _f(DoublePairMatrix(other.getNrSamples(),
+                        DoublePairVector(other.getNrCharacters(),
+                                         std::make_pair(0., 0.))))
 {
 }
 
@@ -26,6 +28,52 @@ FrequencyMatrix::FrequencyMatrix(const StringVector& indexToLocation,
   : BaseMatrix(indexToLocation, indexToSample, indexToCharacter, sampleIndexToLocationIndex)
   , _f(DoublePairMatrix(_k, DoublePairVector(_n, std::make_pair(0., 0.))))
 {
+}
+
+FrequencyMatrix FrequencyMatrix::cluster(const IntMatrix& clustering) const
+{
+  FrequencyMatrix resF;
+  
+  resF._indexToSample = _indexToSample;
+  resF._sampleToIndex = _sampleToIndex;
+  resF._indexToAnatomicalSite = _indexToAnatomicalSite;
+  resF._anatomicalSiteToIndex = _anatomicalSiteToIndex;
+  resF._anatomicalSiteIndexToSampleIndices = _anatomicalSiteIndexToSampleIndices;
+  resF._sampleIndexToAnatomicalSiteIndex = _sampleIndexToAnatomicalSiteIndex;
+  resF._indexToCharacter = StringVector(clustering.size());
+  resF._k = _k;
+  resF._m = _m;
+  resF._n = clustering.size();
+  resF._f = DoublePairMatrix(_k, DoublePairVector(resF._n, std::make_pair(1., 0.)));
+  
+  int cc = 0;
+  for (const IntVector& C : clustering)
+  {
+    for (int c : C)
+    {
+      for (int p = 0; p < _k; ++p)
+      {
+        if (_f[p][c].first < resF._f[p][cc].first)
+        {
+          resF._f[p][cc].first = _f[p][c].first;
+        }
+        if (_f[p][c].second > resF._f[p][cc].second)
+        {
+          resF._f[p][cc].second = _f[p][c].second;
+        }
+      }
+      
+      if (!resF._indexToCharacter[cc].empty())
+      {
+        resF._indexToCharacter[cc] += ";";
+      }
+      resF._indexToCharacter[cc] += _indexToCharacter[c];
+    }
+    resF._characterToIndex[resF._indexToCharacter[cc]] = cc;
+    ++cc;
+  }
+  
+  return resF;
 }
 
 bool FrequencyMatrix::isSurelyPresent(int s, int i) const
@@ -234,6 +282,15 @@ std::istream& operator>>(std::istream& in, FrequencyMatrix& F)
     F._anatomicalSiteIndexToSampleIndices[s].insert(p);
     
     present[p][c] = true;
+  }
+  
+  for (int c = 0; c < F._n; ++c)
+  {
+    const std::string& str = F._indexToCharacter[c];
+    
+    StringVector s;
+    boost::split(s, str, boost::is_any_of(";"));
+    F._characterMultiplicity.push_back(s.size());
   }
   
   return in;

@@ -17,6 +17,8 @@ int main(int argc, char** argv)
   double purity = 1;
   int ploidy = 2;
   double seqErrorRate = 0;
+  bool noPoisson = false;
+  bool noBinomial = false;
   
   lemon::ArgParser ap(argc, argv);
   ap.refOption("s", "Random number generator seed (default: 0)", seed, false)
@@ -24,6 +26,8 @@ int main(int argc, char** argv)
     .refOption("P", "Purity (default: 1)", purity, false)
     .refOption("ploidy", "Ploidy (default: 2)", ploidy, false)
     .refOption("E", "Per base sequencing error rate (default: 0)", seqErrorRate)
+    .refOption("noPoisson", "Disable Poisson distribution for read coverage", noPoisson)
+    .refOption("noBinomial", "Disable binomial distribution for number of variant reads", noBinomial)
     .other("T", "Clone tree");
   ap.parse();
   
@@ -53,5 +57,5 @@ int main(int argc, char** argv)
   }
   
   g_rng = std::mt19937(seed);
-  std::cout << T.getReads(purity, coverage, seqErrorRate, ploidy);
+  std::cout << T.getReads(purity, coverage, seqErrorRate, ploidy, !noPoisson, !noBinomial);
 }

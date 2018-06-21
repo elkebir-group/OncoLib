@@ -95,6 +95,11 @@ public:
   /// @param P Primary index
   bool mS(int P) const;
   
+  /// Cluster frequencies
+  ///
+  /// @param clustering Clustering
+  FrequencyMatrix cluster(const IntMatrix& clustering) const;
+  
 private:
   typedef std::pair<double, double> DoublePair;
   typedef std::vector<DoublePair> DoublePairVector;

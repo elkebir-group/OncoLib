@@ -57,7 +57,7 @@ int main(int argc, char** argv)
   if (Simulation::run(outputDirectory, filenameColorMap,
                       seed, K, mutFreqThreshold,
                       migrationRate, mutationRate, driverProb,
-                      maxNrAnatomicalSites, pattern, N,
+                      maxNrAnatomicalSites, pattern, N, -1,
                       coverage, nrSamplesPerAnatomicalSite, nrSamplesPrimary,
                       seqErrorRate, purity, verbose) >= 1)
   {

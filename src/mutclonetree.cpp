@@ -349,7 +349,9 @@ FrequencyMatrix MutCloneTree::getFrequencies() const
 ReadMatrix MutCloneTree::getReads(double purity,
                                   int sequencingDepth,
                                   double sequencingErrorRate,
-                                  int ploidy) const
+                                  int ploidy,
+                                  bool usePoisson,
+                                  bool useBinomial) const
 {
   FrequencyMatrix F = getFrequencies();
   ReadMatrix R(F.getIndexToAnatomicalSites(),
@@ -366,10 +368,10 @@ ReadMatrix MutCloneTree::getReads(double purity,
       {
         double f = F.min(p, c) * purity / ploidy;
         
-        int coverage = poisson(g_rng);
+        int coverage = usePoisson ? poisson(g_rng) : sequencingDepth;
         std::binomial_distribution<> binom(coverage, f);
         
-        int org_var = binom(g_rng);
+        int org_var = useBinomial ? binom(g_rng) : f * coverage;
         int org_ref = coverage - org_var;
         
         if (g_tol.nonZero(sequencingErrorRate))

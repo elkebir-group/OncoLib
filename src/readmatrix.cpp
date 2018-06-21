@@ -46,7 +46,7 @@ ReadMatrix ReadMatrix::poolReads(const IntMatrix& clustering,
     for (int i : cluster)
     {
       if (!label.empty())
-        label += "_";
+        label += ";";
       
       label += indexToCharacter(i);
       oldCharacterToNewCharacter[i] = idx;
@@ -108,10 +108,6 @@ FrequencyMatrix ReadMatrix::toFrequencyMatrix(double alpha,
       {
         f_lb = f_ub = 0;
       }
-      else if (ref == 0 && var > 0)
-      {
-        f_lb = f_ub = 1;
-      }
       
 //      f_lb *= 2;
 //      f_ub *= 2;
@@ -138,48 +134,11 @@ ReadMatrix ReadMatrix::downSample(int nrSamplesPerAnatomicalSite,
                                   double seqErrorRate,
                                   double fracSNVs) const
 {
-  std::poisson_distribution<> poisson(coverage >= 0 ? coverage : 0);
-  
-  const int new_n = _n * fracSNVs;
-  IntVector snvIndices(_n, 0);
-  for (int i = 1; i < _n; ++i)
-  {
-    snvIndices[i] = snvIndices[i-1] + 1;
-  }
-  std::shuffle(snvIndices.begin(), snvIndices.end(), g_rng);
-  snvIndices.erase(snvIndices.begin() + new_n, snvIndices.end());
-  
+  // TODO: remove SNVs with 0 variant reads in all samples...
   ReadMatrix newR;
   newR._m = _m;
-  newR._n = new_n;
-  if (nrSamplesPerAnatomicalSite < 0)
-  {
-    newR._k = _k;
-    newR._var = IntMatrix(_k,
-                          IntVector(new_n, 0));
-    newR._ref = IntMatrix(_k,
-                          IntVector(new_n, 0));
-  }
-  else
-  {
-    newR._k = nrSamplesPerAnatomicalSite * _m;
-    newR._var = IntMatrix(nrSamplesPerAnatomicalSite * _m,
-                          IntVector(new_n, 0));
-    newR._ref = IntMatrix(nrSamplesPerAnatomicalSite * _m,
-                          IntVector(new_n, 0));
-  }
-  
-  newR._indexToAnatomicalSite = _indexToAnatomicalSite;
-  newR._anatomicalSiteToIndex = _anatomicalSiteToIndex;
-  
+  newR._k = nrSamplesPerAnatomicalSite < 0 ? _k : nrSamplesPerAnatomicalSite * _m;
   newR._anatomicalSiteIndexToSampleIndices = IntSetVector(_m);
-  
-  newR._indexToCharacter = StringVector(new_n);
-  for (int i = 0; i < new_n; ++i)
-  {
-    newR._indexToCharacter[i] = _indexToCharacter[snvIndices[i]];
-    newR._characterToIndex[newR._indexToCharacter[i]] = i;
-  }
   
   int newP = 0;
   for (int s = 0; s < _m; ++s)
@@ -188,7 +147,6 @@ ReadMatrix ReadMatrix::downSample(int nrSamplesPerAnatomicalSite,
                             anatomicalSiteIndexToSampleIndices(s).end());
     
     std::shuffle(sampleIndices.begin(), sampleIndices.end(), g_rng);
-    
     
     int nrSamplesPerAnatomicalSite_s = nrSamplesPerAnatomicalSite < 0 ? anatomicalSiteIndexToSampleIndices(s).size() : nrSamplesPerAnatomicalSite;
     assert(nrSamplesPerAnatomicalSite_s <= sampleIndices.size());
@@ -203,44 +161,95 @@ ReadMatrix ReadMatrix::downSample(int nrSamplesPerAnatomicalSite,
       newR._anatomicalSiteIndexToSampleIndices[s].insert(newP);
       newR._sampleIndexToAnatomicalSiteIndex.push_back(s);
       
-      for (int i = 0; i < new_n; ++i)
+      ++newP;
+    }
+  }
+  
+  IntVector snvIndices;
+  for (const std::pair<std::string, int> kv : _characterToIndex)
+  {
+    int i = kv.second;
+    bool ok = false;
+    for (const std::string& sample : _indexToSample)
+    {
+      if (newR._sampleToIndex.count(sample) == 1)
       {
-        int old_i = snvIndices[i];
-        if (coverage < 0)
+        int p = _sampleToIndex.find(sample)->second;
+        if (getVar(p, i) > 0)
         {
-          newR._var[newP][i] = _var[p][old_i];
-          newR._ref[newP][i] = _ref[p][old_i];
+          ok = true;
+          break;
+        }
+      }
+    }
+    
+    if (ok)
+    {
+      snvIndices.push_back(i);
+    }
+  }
+  
+  const int new_n = std::min((int)(_n * fracSNVs), (int)snvIndices.size());
+  std::shuffle(snvIndices.begin(), snvIndices.end(), g_rng);
+  snvIndices.erase(snvIndices.begin() + new_n, snvIndices.end());
+  newR._n = new_n;
+
+  std::poisson_distribution<> poisson(coverage >= 0 ? coverage : 0);
+
+  newR._var = IntMatrix(newR._k,
+                        IntVector(new_n, 0));
+  newR._ref = IntMatrix(newR._k,
+                        IntVector(new_n, 0));
+  
+  newR._indexToAnatomicalSite = _indexToAnatomicalSite;
+  newR._anatomicalSiteToIndex = _anatomicalSiteToIndex;
+  newR._anatomicalSiteIndexToSampleIndices = IntSetVector(_m);
+  newR._indexToCharacter = StringVector(new_n);
+  for (int i = 0; i < new_n; ++i)
+  {
+    newR._indexToCharacter[i] = _indexToCharacter[snvIndices[i]];
+    newR._characterToIndex[newR._indexToCharacter[i]] = i;
+  }
+
+  for (int p = 0; p < newR._k; ++p)
+  {
+    int pp = _sampleToIndex.find(newR.indexToSample(p))->second;
+    for (int i = 0; i < new_n; ++i)
+    {
+      int old_i = snvIndices[i];
+      if (coverage < 0)
+      {
+        newR._var[p][i] = _var[pp][old_i];
+        newR._ref[p][i] = _ref[pp][old_i];
+      }
+      else
+      {
+        double vaf_pi = purity * double(_var[pp][old_i]) / double(_var[pp][old_i] + _ref[pp][old_i]);
+        int newCoverage = poisson(g_rng);
+        
+        std::binomial_distribution<> binom(newCoverage, vaf_pi);
+        int org_var = binom(g_rng);
+        int org_ref = newCoverage - org_var;
+        
+        if (g_tol.nonZero(seqErrorRate))
+        {
+          std::binomial_distribution<> binom_noise_var(org_var,
+                                                       seqErrorRate);
+          std::binomial_distribution<> binom_noise_ref(org_ref,
+                                                       seqErrorRate);
+          
+          int flips_var = binom_noise_var(g_rng);
+          int flips_ref = binom_noise_ref(g_rng);
+          
+          newR._var[p][i] = org_var - flips_var + flips_ref;
+          newR._ref[p][i] = newCoverage - newR._var[p][i];
         }
         else
         {
-          double vaf_pi = purity * double(_var[p][old_i]) / double(_var[p][old_i] + _ref[p][old_i]);
-          int newCoverage = poisson(g_rng);
-          
-          std::binomial_distribution<> binom(newCoverage, vaf_pi);
-          int org_var = binom(g_rng);
-          int org_ref = newCoverage - org_var;
-          
-          if (g_tol.nonZero(seqErrorRate))
-          {
-            std::binomial_distribution<> binom_noise_var(org_var,
-                                                         seqErrorRate);
-            std::binomial_distribution<> binom_noise_ref(org_ref,
-                                                         seqErrorRate);
-            
-            int flips_var = binom_noise_var(g_rng);
-            int flips_ref = binom_noise_ref(g_rng);
-            
-            newR._var[newP][i] = org_var - flips_var + flips_ref;
-            newR._ref[newP][i] = newCoverage - newR._var[newP][i];
-          }
-          else
-          {
-            newR._var[newP][i] = org_var;
-            newR._ref[newP][i] = newCoverage - newR._var[newP][i];
-          }
+          newR._var[p][i] = org_var;
+          newR._ref[p][i] = newCoverage - newR._var[p][i];
         }
       }
-      ++newP;
     }
   }
   
@@ -377,6 +386,15 @@ std::istream& operator>>(std::istream& in, ReadMatrix& R)
     R._anatomicalSiteIndexToSampleIndices[s].insert(p);
     
     present[p][c] = true;
+  }
+  
+  for (int c = 0; c < R._n; ++c)
+  {
+    const std::string& str = R._indexToCharacter[c];
+   
+    StringVector s;
+    boost::split(s, str, boost::is_any_of(";"));
+    R._characterMultiplicity.push_back(s.size());
   }
   
   return in;

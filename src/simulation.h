@@ -118,6 +118,24 @@ public:
     return _freq.front().front().size();
   }
   
+  /// Return number of mutation clusters
+  int getNrMutationClusters() const
+  {
+    int res = 0;
+    
+    assert(_pCloneTT);
+    const Digraph& T = _pCloneTT->tree();
+    for (NodeIt v(T); v != lemon::INVALID; ++v)
+    {
+      if (v == _pCloneTT->root() || _pCloneTT->isLeaf(v))
+        continue;
+      
+      ++res;
+    }
+    
+    return res;
+  }
+  
   /// Write read counts
   ///
   /// @param out Output stream
@@ -146,6 +164,7 @@ public:
   /// @param maxNrAnatomicalSites Maximum number of (detectable) anatomical sites
   /// @param migrationPattern Migration pattern
   /// @param maxNrTrials Maximum number of trials
+  /// @param desiredNrMutationClusters Desired number of mutation clusters
   /// @param sequencingDepth Target coverage
   /// @param nrSamplesPerAnatomicalSite Number of samples per metastatic anatomical site
   /// @param nrSamplesPrimary Number of samples of the primary tumor
@@ -163,6 +182,7 @@ public:
                  int maxNrAnatomicalSites,
                  int migrationPattern,
                  int maxNrTrials,
+                 int desiredNrMutationClusters,
                  int sequencingDepth,
                  int nrSamplesPerAnatomicalSite,
                  int nrSamplesPrimary,

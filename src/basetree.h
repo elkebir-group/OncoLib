@@ -336,7 +336,96 @@ public:
     assert(IDs.size() == lemon::countNodes(_tree));
     return IDs;
   }
+  
+  /// Return set of ordered pairs of ancestral vertices
+  StringPairSet getAncestralPairs() const
+  {
+    StringPairSet res;
+    for (NodeIt u(_tree); u != lemon::INVALID; ++u)
+    {
+      for (NodeIt v(_tree); v != lemon::INVALID; ++v)
+      {
+        if (u == v) continue;
+        if (isAncestor(u, v))
+        {
+          assert(res.count(StringPair(_nodeToId[u], _nodeToId[v])) == 0);
+          res.insert(StringPair(_nodeToId[u], _nodeToId[v]));
+        }
+      }
+    }
+    return res;
+  }
+  
+  /// Return set of ordered pairs of ancestral vertices
+  StringPairSet getAncestralPairsNoRoot() const
+  {
+    StringPairSet res;
+    for (NodeIt u(_tree); u != lemon::INVALID; ++u)
+    {
+      if (u == _root || parent(u) == _root) continue;
+      for (NodeIt v(_tree); v != lemon::INVALID; ++v)
+      {
+        if (u == v) continue;
+        if (OutArcIt(_tree, v) == lemon::INVALID) continue;
+        if (isAncestor(u, v))
+        {
+          assert(res.count(StringPair(_nodeToId[u], _nodeToId[v])) == 0);
+          res.insert(StringPair(_nodeToId[u], _nodeToId[v]));
+        }
+      }
+    }
+    return res;
+  }
+  
+  /// Return set of directed edges
+  StringPairSet getParentalPairs() const
+  {
+    StringPairSet res;
+    for (ArcIt a(_tree); a != lemon::INVALID; ++a)
+    {
+      Node u = _tree.source(a);
+      Node v = _tree.target(a);
+      
+      assert(res.count(StringPair(_nodeToId[u], _nodeToId[v])) == 0);
+      res.insert(StringPair(_nodeToId[u], _nodeToId[v]));
+    }
+    return res;
+  }
 
+  /// Return set of unordered pairs of incomparable vertices
+  StringPairSet getIncomparablePairs() const
+  {
+    StringPairSet res;
+    for (NodeIt u(_tree); u != lemon::INVALID; ++u)
+    {
+      for (NodeIt v(_tree); v != lemon::INVALID; ++v)
+      {
+        if (_nodeToId[u]  >= _nodeToId[v]) continue;
+        if (areIncomparable(u, v))
+        {
+          assert(res.count(StringPair(_nodeToId[u], _nodeToId[v])) == 0);
+          res.insert(StringPair(_nodeToId[u], _nodeToId[v]));
+        }
+      }
+    }
+    return res;
+  }
+  
+  /// Return recall
+  ///
+  /// @param inferredSet Set of inferred pairs
+  /// @param trueSet Set of true pairs
+  static double recall(const StringPairSet& inferredSet,
+                       const StringPairSet& trueSet)
+  {
+    StringPairSet intersection;
+    std::set_intersection(inferredSet.begin(), inferredSet.end(),
+                          trueSet.begin(), trueSet.end(),
+                          std::inserter(intersection, intersection.begin()));
+    
+    return (double) intersection.size() / (double) trueSet.size();
+  }
+  
 protected:
   /// Tree
   Digraph _tree;

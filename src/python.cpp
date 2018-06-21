@@ -9,6 +9,7 @@
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/args.hpp>
+#include <armadillo>
 #include <iostream>
 #include <fstream>
 #include "utils.h"
@@ -16,6 +17,7 @@
 #include "mutclonetree.h"
 #include "readmatrix.h"
 #include "generatemixture.h"
+#include "enumeratemutationtrees.h"
 
 namespace p = boost::python;
 
@@ -40,6 +42,7 @@ void simulate(std::string outputDirectory = ".",
   int maxNrAnatomicalSites = 3;
   int migrationPattern = 0;
   int nrTrials = -1;
+  int desiredNrMutationClusters = -1;
   int sequencingDepth = 200;
   int nrSamplesPerAnatomicalSite = 2;
   int nrSamplesPrimary = 2;
@@ -47,7 +50,6 @@ void simulate(std::string outputDirectory = ".",
   double purity = 1;
   bool verbose = false;
   
-  py_list_to_std_vector<std::string>(args.keys());
   for (const std::string& key : py_list_to_std_vector<std::string>(args.keys()))
   {
     if (key == "seed")
@@ -86,6 +88,10 @@ void simulate(std::string outputDirectory = ".",
     {
       nrTrials = p::extract<int>(args.get(key));
     }
+    else if (key == "desiredNrMutationClusters")
+    {
+      desiredNrMutationClusters = p::extract<int>(args.get(key));
+    }
     else if (key == "sequencingDepth")
     {
       sequencingDepth = p::extract<int>(args.get(key));
@@ -119,7 +125,8 @@ void simulate(std::string outputDirectory = ".",
   Simulation::run(outputDirectory, filenameColorMap,
                   seed, carryingCapacity, mutFreqThreshold,
                   migrationRate, mutationRate, driverRate,
-                  maxNrAnatomicalSites, migrationPattern, nrTrials,
+                  maxNrAnatomicalSites, migrationPattern,
+                  nrTrials, desiredNrMutationClusters,
                   sequencingDepth, nrSamplesPerAnatomicalSite, nrSamplesPrimary,
                   sequencingErrorRate, purity, verbose);
 }
@@ -312,6 +319,7 @@ void readsToFreqs(const std::string& filenameInReads,
   
   ReadMatrix R;
   inR >> R;
+  inR.close();
   
   std::ofstream outF(filenameOutFreqs.c_str());
   outF << R.toFrequencyMatrix(alpha, 2);
@@ -338,9 +346,405 @@ void sequence(const std::string& filenameInTree,
   g_rng = std::mt19937(seed);
   
   std::ofstream outR(filenameOutReads.c_str());
-  outR << T.getReads(purity, sequencingDepth, sequencingErrorRate, ploidy);
+  outR << T.getReads(purity, sequencingDepth, sequencingErrorRate, ploidy, true, true);
   outR.close();
 }
+
+void precluster(const std::string& filenameInFreqs,
+                const std::string& filenameInClustering,
+                const std::string& filenameOutFreqs)
+{
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  std::ifstream inC(filenameInClustering.c_str());
+  if (!inC.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInClustering + "' for reading");
+  }
+  
+  IntMatrix clustering = F.parseClustering(inC);
+  inC.close();
+  
+  FrequencyMatrix newF = F.cluster(clustering);
+  
+  std::ofstream outF(filenameOutFreqs);
+  outF << newF;
+  outF.close();
+}
+
+void enumerate(const std::string& filenameInFreqs,
+               const std::string& filenameOutTrees,
+               bool spanning,
+               int nrThreads,
+               int timeLimit,
+               bool dryRun)
+{
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  VerbosityLevel oldVerbosity = g_verbosity;
+  g_verbosity = VERBOSE_NONE;
+
+  std::ofstream outT(filenameOutTrees.c_str());
+  
+  EnumerateMutationTrees enumerate(F);
+  enumerate.enumerate("",
+                      nrThreads,
+                      -1,
+                      timeLimit,
+                      spanning,
+                      dryRun,
+                      outT);
+  
+  g_verbosity = oldVerbosity;
+  
+  outT.close();
+}
+
+double countSpanningTrees(const std::string& filenameInFreqs)
+{
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  EnumerateMutationTrees mutT(F);
+  
+  const Digraph& G = mutT.getAncestryGraph().G();
+  lemon::DynArcLookUp<Digraph> arcLookUp(G);
+  
+  // ASSUMPTION mutation with index 0 is root mutation
+  // TODO: generalize ASSUMPTION
+  arma::mat L(F.getNrCharacters() - 1, F.getNrCharacters() - 1);
+  for (int i = 1; i < F.getNrCharacters(); ++i)
+  {
+    for (int j = 1; j < F.getNrCharacters(); ++j)
+    {
+      if (i == j)
+      {
+        Node v_j = mutT.getAncestryGraph().charStateToNode(j, 1);
+        L(i - 1, j - 1) = lemon::countInArcs(G, v_j) - 1;
+      }
+      else
+      {
+        Node v_i = mutT.getAncestryGraph().charStateToNode(i, 1);
+        Node v_j = mutT.getAncestryGraph().charStateToNode(j, 1);
+        
+        if (arcLookUp(v_i, v_j) != lemon::INVALID)
+        {
+          L(i - 1, j - 1) = -1.;
+        }
+        else
+        {
+          L(i - 1, j - 1) = 0.;
+        }
+      }
+    }
+  }
+  
+  std::cout << L << std::endl;
+  
+  return arma::det(L);
+}
+
+CloneTree parseNextTree(std::istream& in)
+{
+  int nrEdges = -1;
+  std::string line;
+  std::stringstream ss;
+  
+  getline(in, line);
+  ss.clear();
+  ss.str(line);
+  ss >> nrEdges;
+  
+  if (nrEdges < 0)
+  {
+    throw std::runtime_error("Error: number of edges should be nonnegative");
+  }
+  
+  ss.clear();
+  ss.str("");
+  for (int j = 0; j < nrEdges; ++j)
+  {
+    getline(in, line);
+    ss << line << std::endl;
+  }
+  
+  CloneTree T;
+  if (!T.read(ss))
+    throw std::runtime_error("");
+  
+  return T;
+}
+
+void filterSCS(const std::string& filenameInInferredTrees,
+               const std::string& filenameInTrueTree,
+               const std::string& filenameOutTrees,
+               int nrClones,
+               int seed)
+{
+  // 0. parse true clone tree
+  std::ifstream inTrueTree(filenameInTrueTree.c_str());
+  if (!inTrueTree.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTrueTree + "' for reading");
+  }
+  
+  MutCloneTree trueT;
+  inTrueTree >> trueT;
+  inTrueTree.close();
+  
+  // 1. collect clones
+  std::vector<StringVector> clones;
+  for (Node leaf : trueT.leafSet())
+  {
+    clones.push_back(StringVector());
+    Node u = leaf;
+    while ((u = trueT.parent(u)) != trueT.root())
+    {
+      clones.back().push_back(trueT.label(u));
+    }
+  }
+  
+  g_rng = std::mt19937(seed);
+  std::shuffle(clones.begin(), clones.end(), g_rng);
+  while (clones.size() > nrClones)
+  {
+    clones.pop_back();
+  }
+  
+  // 2. parse enumerated trees
+  std::ifstream inTrees(filenameInInferredTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInInferredTrees + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  std::ofstream outTrees(filenameOutTrees);
+  for (const StringVector& clone : clones)
+  {
+    outTrees << "#";
+    for (const std::string& mut : clone)
+    {
+      outTrees << " " << mut;
+    }
+    outTrees << std::endl;
+  }
+  
+  for (int i = 0; i < nrTrees; ++i)
+  {
+    StringPairSet diff;
+    CloneTree T = parseNextTree(inTrees);
+    
+    bool ok = true;
+    for (const StringVector& clone : clones)
+    {
+      Node u = T.getNodeByLabel(clone[0]);
+      int idx = 0;
+      while (u != lemon::INVALID && ok)
+      {
+        ok &= (idx < clone.size()) && (T.label(u) == clone[idx]);
+        u = T.parent(u);
+        ++idx;
+      }
+    }
+    
+    if (ok)
+    {
+      outTrees << lemon::countArcs(T.tree()) << " #edges" << std::endl;
+      T.write(outTrees);
+    }
+  }
+  outTrees.close();
+}
+
+void filterLR(const std::string& filenameInInferredTrees,
+              const std::string& filenameInTrueTree,
+              const std::string& filenameOutTrees,
+              int nrPairs,
+              int seed)
+{
+  // 0. parse true clone tree
+  std::ifstream inTrueTree(filenameInTrueTree.c_str());
+  if (!inTrueTree.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTrueTree + "' for reading");
+  }
+  
+  MutCloneTree trueT;
+  inTrueTree >> trueT;
+  inTrueTree.close();
+  
+  // 1. collect clones
+  StringPairSet ancestralPairSet = trueT.getAncestralPairsNoRoot();
+  std::vector<StringPair> vec(ancestralPairSet.begin(), ancestralPairSet.end());
+  
+  g_rng = std::mt19937(seed);
+  std::shuffle(vec.begin(), vec.end(), g_rng);
+  while (vec.size() > nrPairs)
+  {
+    vec.pop_back();
+  }
+  ancestralPairSet = StringPairSet(vec.begin(), vec.end());
+  
+  // 2. parse enumerated trees
+  std::ifstream inTrees(filenameInInferredTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInInferredTrees + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  std::ofstream outTrees(filenameOutTrees);
+  for (const StringPair& pair : ancestralPairSet)
+  {
+    outTrees << "# " << pair.first << " " << pair.second << std::endl;
+  }
+  
+  for (int i = 0; i < nrTrees; ++i)
+  {
+    StringPairSet diff;
+    CloneTree T = parseNextTree(inTrees);
+    StringPairSet ancestralPairSetT = T.getAncestralPairs();
+    
+    std::set_difference(ancestralPairSet.begin(), ancestralPairSet.end(),
+                        ancestralPairSetT.begin(), ancestralPairSetT.end(),
+                        std::inserter(diff, diff.begin()));
+    
+    if (diff.empty())
+    {
+      outTrees << lemon::countArcs(T.tree()) << " #edges" << std::endl;
+      T.write(outTrees);
+    }
+  }
+  outTrees.close();
+}
+
+void computeRecall(const std::string& filenameInInferredTrees,
+                   const std::string& filenameInTrueTree,
+                   const std::string& filenameOutRecall)
+{
+  std::ifstream inTrueTree(filenameInTrueTree.c_str());
+  if (!inTrueTree.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTrueTree + "' for reading");
+  }
+  
+  CloneTree trueT;
+  if (!trueT.read(inTrueTree))
+  {
+    throw std::runtime_error("Parse error: '" + filenameInTrueTree + "'");
+  }
+  inTrueTree.close();
+  
+  StringPairSet trueParental = trueT.getParentalPairs();
+  StringPairSet trueAncestral = trueT.getAncestralPairs();
+  StringPairSet trueIncomparable = trueT.getIncomparablePairs();
+  
+  std::ifstream inTrees(filenameInInferredTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInInferredTrees + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  std::ofstream outRecall(filenameOutRecall);
+  outRecall << "solution\tancestral\tparental\tincomparable" << std::endl;
+  for (int treeIdx = 0; treeIdx < nrTrees; ++treeIdx)
+  {
+    CloneTree T = parseNextTree(inTrees);
+    StringPairSet inferredParental = T.getParentalPairs();
+    StringPairSet inferredAncestral = T.getAncestralPairs();
+    StringPairSet inferredIncomparable = T.getIncomparablePairs();
+    
+    outRecall << treeIdx << "\t"
+              << BaseTree::recall(inferredAncestral, trueAncestral)
+              << "\t"
+              << BaseTree::recall(inferredParental, trueParental)
+              << "\t"
+              << BaseTree::recall(inferredIncomparable, trueIncomparable)
+              << std::endl;
+  }
+  inTrees.close();
+  outRecall.close();
+}
+
+double getFractionOfIncomparablePairs(const std::string& filenameInFreqs)
+{
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  return EnumerateMutationTrees(F).getAncestryGraph().fracOfIncomparablePairs();
+}
+
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(sequence_overloads, sequence, 3, 7);
 
@@ -354,7 +758,7 @@ BOOST_PYTHON_FUNCTION_OVERLOADS(simulate_overloads, simulate, 0, 2);
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(mix_overloads, mix, 4, 5);
 
-BOOST_PYTHON_MODULE(oncosim)
+BOOST_PYTHON_MODULE(oncolib)
 {
   p::def("sequence", sequence,
          sequence_overloads(p::args("filenameInTree",
@@ -377,6 +781,7 @@ BOOST_PYTHON_MODULE(oncosim)
                                                           "'maxNrAnatomicalSites':3, "\
                                                           "'migrationPattern':0, "\
                                                           "'nrTrials':-1, "\
+                                                          "'desiredNrMutationClusters':-1, "
                                                           "'sequencingDepth':200, "\
                                                           "'nrSamplesPerAnatomicalSite':2, "\
                                                           "'nrSamplesPrimary':2, "\
@@ -417,4 +822,20 @@ BOOST_PYTHON_MODULE(oncosim)
   p::def("tree2freqs", treeToFreqs, "Extract mutation frequencies from clone tree");
   
   p::def("reads2freqs", readsToFreqs, "Extract mutation frequencies from reads");
+  
+  p::def("precluster", precluster, "Cluster mutation frequencies given clustering");
+  
+  p::def("enumerate", enumerate, "Enumerate mutation trees");
+  
+  p::def("countSpanningTrees", countSpanningTrees,
+         "Compute number of spanning arborescence in ancestry graph");
+  
+  p::def("computeRecall", computeRecall, "Compute recall");
+  
+  p::def("getFractionOfIncomparablePairs", getFractionOfIncomparablePairs,
+         "Compute fraction of incomparable pairs");
+  
+  p::def("filterSCS", filterSCS, "Include SCS information");
+  
+  p::def("filterLR", filterLR, "Include long read information");
 }

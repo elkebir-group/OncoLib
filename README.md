@@ -1,6 +1,6 @@
 # OncoSim
 
-OncoSim is a library for simulating the evolution and NGS sequencing of a metastatic tumor.
+OncoLib is a library for simulating the evolution and NGS sequencing of a metastatic tumor.
 
 ## Contents
 

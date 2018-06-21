@@ -67,6 +67,7 @@ typedef IntSet::const_iterator IntSetIt;
 typedef std::list<std::string> StringList;
 typedef std::set<std::string> StringSet;
 typedef std::pair<std::string, std::string> StringPair;
+typedef std::set<StringPair> StringPairSet;
 typedef std::list<StringPair> StringPairList;
 typedef Digraph::NodeMap<StringSet> StringSetNodeMap;
 typedef Digraph::NodeMap<StringList> StringListNodeMap;

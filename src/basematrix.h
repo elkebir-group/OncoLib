@@ -197,6 +197,38 @@ public:
     return _anatomicalSiteIndexToSampleIndices;
   }
   
+  /// Return character multiplicity
+  ///
+  /// @param c Character index
+  int getCharacterMultiplicity(int c) const
+  {
+    assert(0 <= c && c < _n);
+    
+    return _characterMultiplicity[c];
+  }
+  
+  /// Return character multiplicities
+  const IntVector& getCharacterMultiplicities() const
+  {
+    return _characterMultiplicity;
+  }
+  
+  /// Return sum of character multiplicities
+  int getMultiplicitySum() const
+  {
+    int res = 0;
+    for (int s : _characterMultiplicity)
+    {
+      res += s;
+    }
+    return res;
+  }
+  
+  /// Parse clustering
+  ///
+  /// @param in Input stream
+  IntMatrix parseClustering(std::istream& in) const;
+  
 protected:
   /// Number of anatomical sites
   int _m;
@@ -220,6 +252,8 @@ protected:
   IntVector _sampleIndexToAnatomicalSiteIndex;
   /// Anatomical site index to sample indices
   IntSetVector _anatomicalSiteIndexToSampleIndices;
+  /// Character multiplicities
+  IntVector _characterMultiplicity;
 };
 
 #endif // BASEMATRIX_H

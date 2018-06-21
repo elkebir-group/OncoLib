@@ -19,6 +19,7 @@ BaseMatrix::BaseMatrix()
   , _characterToIndex()
   , _sampleIndexToAnatomicalSiteIndex()
   , _anatomicalSiteIndexToSampleIndices()
+  , _characterMultiplicity()
 {
 }
 
@@ -37,6 +38,7 @@ BaseMatrix::BaseMatrix(const StringVector& indexToLocation,
   , _characterToIndex()
   , _sampleIndexToAnatomicalSiteIndex(sampleIndexToLocationIndex)
   , _anatomicalSiteIndexToSampleIndices(_m)
+  , _characterMultiplicity(_n)
 {
   for (int s = 0; s < _m; ++s)
   {
@@ -56,5 +58,43 @@ BaseMatrix::BaseMatrix(const StringVector& indexToLocation,
   {
     const std::string& str = _indexToCharacter[c];
     _characterToIndex[str] = c;
+
+    StringVector s;
+    boost::split(s, str, boost::is_any_of(";"));
+    _characterMultiplicity[c] = s.size();
   }
+}
+
+IntMatrix BaseMatrix::parseClustering(std::istream& in) const
+{
+  IntMatrix clustering;
+  
+  while (in.good())
+  {
+    std::string line;
+    getline(in, line);
+    
+    if (line.empty()) continue;
+    
+    clustering.push_back(IntVector());
+    
+    StringVector s;
+    boost::split(s, line, boost::is_any_of(";"));
+    
+    IntVector ss;
+    bool ok = true;
+    for (const std::string& cStr : s)
+    {
+      int c = characterToIndex(cStr);
+      ok = ok && (c != -1);
+      
+      clustering.back().push_back(c);
+    }
+    if (!ok)
+    {
+      clustering.pop_back();
+    }
+  }
+  
+  return clustering;
 }
