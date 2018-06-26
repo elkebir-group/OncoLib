@@ -416,7 +416,8 @@ void enumerate(const std::string& filenameInFreqs,
   outT.close();
 }
 
-double countSpanningTrees(const std::string& filenameInFreqs)
+double countSpanningTrees(const std::string& filenameInFreqs,
+                          int root = 0)
 {
   std::ifstream inF(filenameInFreqs.c_str());
   if (!inF.good())
@@ -436,14 +437,23 @@ double countSpanningTrees(const std::string& filenameInFreqs)
   // ASSUMPTION mutation with index 0 is root mutation
   // TODO: generalize ASSUMPTION
   arma::mat L(F.getNrCharacters() - 1, F.getNrCharacters() - 1);
-  for (int i = 1; i < F.getNrCharacters(); ++i)
+  
+  for (int i = 0; i < F.getNrCharacters(); ++i)
   {
-    for (int j = 1; j < F.getNrCharacters(); ++j)
+    for (int j = 0; j < F.getNrCharacters(); ++j)
     {
+      if (i == root || j == root)
+      {
+        continue;
+      }
+      
+      int ii = i > root ? i - 1 : i;
+      int jj = j > root ? j - 1 : j;
+      
       if (i == j)
       {
         Node v_j = mutT.getAncestryGraph().charStateToNode(j, 1);
-        L(i - 1, j - 1) = lemon::countInArcs(G, v_j) - 1;
+        L(ii, jj) = lemon::countInArcs(G, v_j) - 1;
       }
       else
       {
@@ -452,17 +462,17 @@ double countSpanningTrees(const std::string& filenameInFreqs)
         
         if (arcLookUp(v_i, v_j) != lemon::INVALID)
         {
-          L(i - 1, j - 1) = -1.;
+          L(ii, jj) = -1.;
         }
         else
         {
-          L(i - 1, j - 1) = 0.;
+          L(ii, jj) = 0.;
         }
       }
     }
   }
   
-  std::cout << L << std::endl;
+//  std::cout << L << std::endl;
   
   return arma::det(L);
 }
@@ -745,6 +755,235 @@ double getFractionOfIncomparablePairs(const std::string& filenameInFreqs)
   return EnumerateMutationTrees(F).getAncestryGraph().fracOfIncomparablePairs();
 }
 
+void summarize(const std::string& filenameInAllTrees,
+               const std::string& filenameInSampledTree,
+               const std::string& filenameOutSummary)
+{
+  // 1. Parse sampled trees
+  std::map<StringPairSet, int> sampledTreeHistogram;
+  
+  std::ifstream inTrees(filenameInSampledTree.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInSampledTree + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  for (int treeIdx = 0; treeIdx < nrTrees; ++treeIdx)
+  {
+    CloneTree T = parseNextTree(inTrees);
+    StringPairSet edges;
+    for (ArcIt a(T.tree()); a != lemon::INVALID; ++a)
+    {
+      Node u = T.tree().source(a);
+      Node v = T.tree().target(a);
+      
+      edges.insert(StringPair(T.label(u), T.label(v)));
+    }
+    if (sampledTreeHistogram.count(edges) == 0)
+    {
+      sampledTreeHistogram[edges] = 1;
+    }
+    else
+    {
+      ++sampledTreeHistogram[edges];
+    }
+  }
+  inTrees.close();
+  
+  // 2. Parse all trees
+  std::map<StringPairSet, int> allTreeIndex;
+  
+  inTrees = std::ifstream(filenameInAllTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInAllTrees + "' for reading");
+  }
+  
+  nrTrees = -1;
+  line.clear();
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  
+  ss.clear();
+  ss.str(line);
+  ss >> nrTrees;
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  for (int treeIdx = 0; treeIdx < nrTrees; ++treeIdx)
+  {
+    CloneTree T = parseNextTree(inTrees);
+    StringPairSet edges;
+    for (ArcIt a(T.tree()); a != lemon::INVALID; ++a)
+    {
+      Node u = T.tree().source(a);
+      Node v = T.tree().target(a);
+      
+      edges.insert(StringPair(T.label(u), T.label(v)));
+    }
+    if (allTreeIndex.count(edges) > 0)
+    {
+      throw std::runtime_error("Error: duplicate tree");
+    }
+    
+    allTreeIndex[edges] = treeIdx;
+  }
+  inTrees.close();
+  
+  std::ofstream outSum(filenameOutSummary);
+  int incorrect = 0;
+  outSum << "index\tcount" << std::endl;
+  for (const auto& kv : sampledTreeHistogram)
+  {
+    if (allTreeIndex.count(kv.first) == 0)
+    {
+      outSum << --incorrect << "\t" << kv.second << std::endl;
+    }
+    else
+    {
+      outSum << allTreeIndex[kv.first] << "\t" << kv.second << std::endl;
+    }
+  }
+  for (const auto& kv : allTreeIndex)
+  {
+    if (sampledTreeHistogram.count(kv.first) == 0)
+    {
+      outSum << kv.second << "\t" << 0 << std::endl;
+    }
+  }
+  outSum.close();
+}
+
+int rejectionSample(const std::string& filenameInFreqs,
+                    const std::string& filenameOutTrees,
+                    int count,
+                    int seed = 0)
+{
+  g_rng = std::mt19937(seed);
+  
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  const int n = F.getNrCharacters();
+  const int k = F.getNrSamples();
+  
+  RealTensor FF(2, k, n);
+  for (int p = 0; p < k; ++p)
+  {
+    FF.setRowLabel(p, F.indexToSample(p));
+    for (int i = 0; i < n; ++i)
+    {
+      if (p == 0)
+      {
+        FF.setColLabel(i, F.indexToCharacter(i));
+      }
+      FF.set(1, p, i, F.min(p, i));
+      FF.set(0, p, i, 1 - F.max(p, i));
+    }
+  }
+  
+  StateTreeVector S(F.getNrCharacters(), StateTree({-1, 0}));
+  
+  gm::RootedCladisticAncestryGraph G(FF, S);
+  G.init();
+  
+  std::ofstream outTrees(filenameOutTrees);
+  outTrees << count << " #trees" << std::endl;
+  StringPairSet tree;
+  int sampleCount = 0;
+  while (count > 0)
+  {
+    ++sampleCount;
+    if (G.sample(tree))
+    {
+      outTrees << tree.size() << " #edges" << std::endl;
+      for (const StringPair& edge : tree)
+      {
+        outTrees << edge.first << " " << edge.second << std::endl;
+      }
+      --count;
+    }
+  }
+  
+  return sampleCount;
+}
+
+int identifySolution(const std::string& filenameInTrees,
+                     const std::string& filenameInTree)
+{
+  std::ifstream inTrueTree(filenameInTree.c_str());
+  if (!inTrueTree.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTree + "' for reading");
+  }
+  
+  CloneTree trueT;
+  if (!trueT.read(inTrueTree))
+  {
+    throw std::runtime_error("Parse error: '" + filenameInTree + "'");
+  }
+  inTrueTree.close();
+  StringPairSet edgesTrueT = trueT.getEdgeSet();
+  
+  std::ifstream inTrees(filenameInTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTrees + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  int res = -1;
+  for (int treeIdx = 0; treeIdx < nrTrees; ++treeIdx)
+  {
+    CloneTree T = parseNextTree(inTrees);
+    if (T.getEdgeSet() == edgesTrueT)
+    {
+      res = treeIdx;
+      break;
+    }
+  }
+  inTrees.close();
+  
+  return res;
+}
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(sequence_overloads, sequence, 3, 7);
 
@@ -756,7 +995,11 @@ BOOST_PYTHON_FUNCTION_OVERLOADS(visualizeMigrationGraph_overloads, visualizeMigr
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(simulate_overloads, simulate, 0, 2);
 
+BOOST_PYTHON_FUNCTION_OVERLOADS(countSpanningTrees_overloads, countSpanningTrees, 1, 2);
+
 BOOST_PYTHON_FUNCTION_OVERLOADS(mix_overloads, mix, 4, 5);
+
+BOOST_PYTHON_FUNCTION_OVERLOADS(rejectionSample_overloads, rejectionSample, 3, 4);
 
 BOOST_PYTHON_MODULE(oncolib)
 {
@@ -828,7 +1071,9 @@ BOOST_PYTHON_MODULE(oncolib)
   p::def("enumerate", enumerate, "Enumerate mutation trees");
   
   p::def("countSpanningTrees", countSpanningTrees,
-         "Compute number of spanning arborescence in ancestry graph");
+         countSpanningTrees_overloads(p::args("filenameInF",
+                                              "root=0"),
+                                      "Compute number of spanning arborescence in ancestry graph"));
   
   p::def("computeRecall", computeRecall, "Compute recall");
   
@@ -838,4 +1083,15 @@ BOOST_PYTHON_MODULE(oncolib)
   p::def("filterSCS", filterSCS, "Include SCS information");
   
   p::def("filterLR", filterLR, "Include long read information");
+  
+  p::def("summarize", summarize, "Compute histogram of sampled trees w.r.t. all trees");
+  
+  p::def("identifySolution", identifySolution, "Determine whether specified tree occurs in specified trees");
+  
+  p::def("rejectionSample", rejectionSample,
+         rejectionSample_overloads(p::args("filenameInFreqs",
+                                           "filenameOutTrees",
+                                           "count",
+                                           "seed=0"),
+                                   "Rejection sampling of spanning trees satisfying SC"));
 }

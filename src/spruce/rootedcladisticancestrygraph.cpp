@@ -23,6 +23,75 @@ RootedCladisticAncestryGraph::RootedCladisticAncestryGraph(const RealTensor& F,
   , _label(_G)
 {
 }
+  
+bool RootedCladisticAncestryGraph::sample(StringPairSet& sampledTree) const
+{
+  sampledTree.clear();
+  
+  BoolNodeMap nodeMap(_G, false);
+  BoolArcMap arcMap(_G, false);
+  SubDigraph T(_G, nodeMap, arcMap);
+  
+  for (NodeIt v(_G); v != lemon::INVALID; ++v)
+  {
+    if (v == _root) continue;
+    
+    nodeMap[v] = true;
+
+    ArcVector options;
+    for (InArcIt a(_G, v); a != lemon::INVALID; ++a)
+    {
+      if (_G.source(a) != _root)
+      {
+        options.push_back(a);
+      }
+    }
+    if (!options.empty())
+    {
+      std::shuffle(options.begin(), options.end(), g_rng);
+      
+      arcMap[options.front()] = true;
+      nodeMap[T.source(options.front())] = true;
+    }
+  }
+  
+  for (SubArcIt a(T); a != lemon::INVALID; ++a)
+  {
+    Node u = T.source(a);
+    Node v = T.target(a);
+    
+    if (u == _root) continue;
+    
+    int c = _nodeToCharState[u].begin()->first;
+    int d = _nodeToCharState[v].begin()->first;
+    
+    sampledTree.insert(StringPair(_F.getColLabel(c), _F.getColLabel(d)));
+  }
+  
+  bool ok = true;
+  for (SubNodeIt v(T); v != lemon::INVALID; ++v)
+  {
+    const IntPair& ci = *_nodeToCharState[v].begin();
+    for (int p = 0; p < _F.m(); ++p)
+    {
+      double f_pci = _F.getCumFreq(p, ci.first, _S[ci.first].D(ci.second));
+      double sum = 0.;
+      for (SubOutArcIt a(T, v); a != lemon::INVALID; ++a)
+      {
+        Node w = T.target(a);
+        const IntPair& dj = *_nodeToCharState[w].begin();
+        double f_pdj = _F.getCumFreq(p, dj.first, _S[dj.first].D(dj.second));
+        sum += f_pdj;
+      }
+      if (g_tol.less(f_pci, sum))
+      {
+        ok = false;
+      }
+    }
+  }
+  
+  return ok;
+}
 
 double RootedCladisticAncestryGraph::fracOfIncomparablePairs() const
 {

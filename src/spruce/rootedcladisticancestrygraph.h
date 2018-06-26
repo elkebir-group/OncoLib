@@ -101,6 +101,27 @@ public:
     return _root;
   }
   
+  Node monoclonalRoot() const
+  {
+    Node result = lemon::INVALID;
+    
+    for (NodeIt v(_G); v != lemon::INVALID; ++v)
+    {
+      if (lemon::countInArcs(_G, v) == 1 && result == lemon::INVALID)
+      {
+        result = v;
+      }
+      else if (lemon::countInArcs(_G, v) == 1)
+      {
+        return lemon::INVALID;
+      }
+    }
+    
+    return result;
+  }
+  
+  bool sample(StringPairSet& sampledTree) const;
+  
   Node charStateToNode(int c, int i) const
   {
     assert(0 <= c && c < _F.n());

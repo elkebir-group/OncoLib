@@ -284,6 +284,20 @@ public:
     return colorMap;
   }
   
+  /// Return the edge set
+  StringPairSet getEdgeSet() const
+  {
+    StringPairSet res;
+    for (ArcIt a(_tree); a != lemon::INVALID; ++a)
+    {
+      Node u = _tree.source(a);
+      Node v = _tree.target(a);
+      
+      res.insert(StringPair(_nodeToId[u], _nodeToId[v]));
+    }
+    return res;
+  }
+  
   /// Return the edge list
   StringPairList getEdgeList() const
   {
