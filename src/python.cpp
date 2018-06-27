@@ -434,8 +434,6 @@ double countSpanningTrees(const std::string& filenameInFreqs,
   const Digraph& G = mutT.getAncestryGraph().G();
   lemon::DynArcLookUp<Digraph> arcLookUp(G);
   
-  // ASSUMPTION mutation with index 0 is root mutation
-  // TODO: generalize ASSUMPTION
   arma::mat L(F.getNrCharacters() - 1, F.getNrCharacters() - 1);
   
   for (int i = 0; i < F.getNrCharacters(); ++i)
@@ -933,6 +931,94 @@ int rejectionSample(const std::string& filenameInFreqs,
   return sampleCount;
 }
 
+std::string visualizeEnumeratedCloneTree(const std::string& filenameInFreqs,
+                                         const std::string& filenameInTrees,
+                                         int index,
+                                         bool showCharacterLabels = false,
+                                         int offset = 1,
+                                         bool showFrequencies = false)
+{
+  std::ifstream inF(filenameInFreqs.c_str());
+  if (!inF.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInFreqs + "' for reading");
+  }
+  
+  FrequencyMatrix F;
+  inF >> F;
+  inF.close();
+  
+  std::ifstream inTrees(filenameInTrees.c_str());
+  if (!inTrees.good())
+  {
+    throw std::runtime_error("Error: could not open '" + filenameInTrees + "' for reading");
+  }
+  
+  int nrTrees = -1;
+  std::string line;
+  while (line.empty() || line[0] == '#')
+  {
+    getline(inTrees, line);
+  }
+  
+  std::stringstream ss(line);
+  ss >> nrTrees;
+  if (nrTrees < 0)
+  {
+    throw std::runtime_error("Error: number of trees should be nonnegative");
+  }
+  
+  if (!(0 <= index && index < nrTrees))
+  {
+    throw std::runtime_error("Error: invalid index");
+  }
+
+  std::stringstream ssOut;
+  for (int treeIdx = 0; treeIdx < nrTrees; ++treeIdx)
+  {
+    CloneTree T = parseNextTree(inTrees);
+    if (index == treeIdx)
+    {
+      ssOut << "digraph T_" << index << " {" << std::endl;
+      
+      for (NodeIt v(T.tree()); v != lemon::INVALID; ++v)
+      {
+        ssOut << "  " << T.tree().id(v) << " [label=\"";
+        
+        const std::string& label_v = T.label(v);
+        if (showCharacterLabels)
+          ssOut << label_v;
+        else
+          ssOut << F.characterToIndex(label_v) + offset;
+        
+        if (showFrequencies)
+        {
+          for (int p = 0; p < F.getNrSamples(); ++p)
+          {
+            ssOut << "\\n" << F.min(p, F.characterToIndex(label_v));
+          }
+        }
+        
+        ssOut << "\"]" << std::endl;
+      }
+      
+      for (ArcIt a(T.tree()); a != lemon::INVALID; ++a)
+      {
+        Node u = T.tree().source(a);
+        Node v = T.tree().target(a);
+        
+        ssOut << "  " << T.tree().id(u) << " -> " << T.tree().id(v) << std::endl;
+      }
+      
+      ssOut << "}" << std::endl;
+      break;
+    }
+  }
+  inTrees.close();
+  
+  return ssOut.str();
+}
+
 int identifySolution(const std::string& filenameInTrees,
                      const std::string& filenameInTree)
 {
@@ -991,6 +1077,8 @@ BOOST_PYTHON_FUNCTION_OVERLOADS(downSample_overloads, downSample, 4, 8);
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(visualizeCloneTree_overloads, visualizeCloneTree, 1, 3);
 
+BOOST_PYTHON_FUNCTION_OVERLOADS(visualizeEnumeratedCloneTree_overloads, visualizeEnumeratedCloneTree, 3, 6);
+
 BOOST_PYTHON_FUNCTION_OVERLOADS(visualizeMigrationGraph_overloads, visualizeMigrationGraph, 1, 2);
 
 BOOST_PYTHON_FUNCTION_OVERLOADS(simulate_overloads, simulate, 0, 2);
@@ -1038,6 +1126,15 @@ BOOST_PYTHON_MODULE(oncolib)
                                               "filenameInColorMap=''",
                                               "filenameInVertexLabeling=''"),
                                       "Visualize clone tree in DOT format"));
+  
+  p::def("enumeratedtree2dot", visualizeEnumeratedCloneTree,
+         visualizeEnumeratedCloneTree_overloads(p::args("filenameInFreqs",
+                                                        "filenameInTrees",
+                                                        "index",
+                                                        "showCharacterLabels=False",
+                                                        "offset=1",
+                                                        "showFrequencies=False"),
+                                                "Visualize enumerated clone tree in DOT format"));
   
   p::def("graph2dot", visualizeMigrationGraph,
          visualizeMigrationGraph_overloads(p::args("filenameInTree",
