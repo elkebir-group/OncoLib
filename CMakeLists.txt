@@ -352,9 +352,9 @@ set( GitCommand2 "log --pretty=format:\\\"%h\\\" -1" )
 execute_process( COMMAND git log --pretty=format:%h WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 COMMAND head -n 1  COMMAND tr -d "\\n" OUTPUT_VARIABLE GitHashtag )
 
-set( Boost_USE_STATIC_LIBS ON )
-find_package(PythonLibs 2.7 REQUIRED)
-find_package( Boost REQUIRED COMPONENTS thread system filesystem python2.7 )
+#set( Boost_USE_STATIC_LIBS ON )
+find_package(PythonLibs)
+find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
 MESSAGE( STATUS "found boost:"
 "\nINCLUDE: ${Boost_INCLUDE_DIRS}"
 "\nLIB: ${Boost_LIBRARIES}"
@@ -362,7 +362,10 @@ MESSAGE( STATUS "found boost:"
 
 FIND_PACKAGE(PythonInterp REQUIRED)
 FIND_PACKAGE(PythonLibsNew REQUIRED)
-find_package(Armadillo REQUIRED)
+FIND_PACKAGE(Armadillo REQUIRED)
+
+include_directories( "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} )
+link_directories( "${LIBLEMON_ROOT}/lib" )
 
 # custom macro with most of the redundant code for making a python example module
 MACRO( addPythonExe _name _srccpp )
@@ -379,13 +382,10 @@ TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_
 TARGET_LINK_LIBRARIES(${_name} ${CommonLibs})
 ENDMACRO()
 
-include_directories( "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} )
-link_directories( "${LIBLEMON_ROOT}/lib" )
-
 set( CommonLibs
   m
-  emon
   pthread
+  emon
   ${Boost_LIBRARIES}
   ${ARMADILLO_LIBRARIES}
 )

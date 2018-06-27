@@ -1,6 +1,6 @@
-# OncoSim
+# OncoLib
 
-OncoLib is a library for simulating the evolution and NGS sequencing of a metastatic tumor.
+OncoLib is a library for reconstructing and simulating the evolution and NGS sequencing of a metastatic tumor.
 
 ## Contents
 
@@ -27,6 +27,7 @@ OncoSim is written in C++11 and thus requires a modern C++ compiler (GCC >= 4.8.
 
 * [CMake](http://www.cmake.org/) (>= 3.0)
 * [Boost](http://www.boost.org) (>= 1.55)
+* [Armadillo](http://arma.sourceforge.net/) (>= 8)
 * [LEMON](http://lemon.cs.elte.hu/trac/lemon) graph library (>= 1.3)
 
 [Graphviz](http://www.graphviz.org) is required to visualize the resulting DOT files, but is not required for compilation.
@@ -43,9 +44,14 @@ To compile OncoSim, execute the following commands from the root of the reposito
     $ cmake ..
     $ make
 
-In case CMake fails to detect LEMON, run the following command with adjusted paths:
+In case CMake fails to detect any of the above libraries, run the following command with adjusted paths:
 
-    $ cmake -DLIBLEMON_ROOT=~/lemon ..
+    $ cmake .. -DCMAKE_PREFIX_PATH=/data/work/yunan/subclone/software/armadillo-8.500.1/build \
+    	-DLIBLEMON_ROOT=/data/work/yunan/subclone/software/lemon-1.3.1/build \
+    	-DBOOST_LIBRARYDIR=/data/work/yunan/software/anaconda3/lib/ \
+    	-DBOOST_ROOT=/data/work/yunan/software/anaconda3/include/boost \
+    	-DPYTHON_INCLUDE_DIR=/data/work/yunan/software/anaconda3/include/python3.6m \
+    	-DPYTHON_LIBRARY=/data/work/yunan/software/anaconda3/lib
 
 The compilation results in the following files in the `build` directory:
 
