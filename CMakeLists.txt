@@ -354,7 +354,11 @@ COMMAND head -n 1  COMMAND tr -d "\\n" OUTPUT_VARIABLE GitHashtag )
 
 #set( Boost_USE_STATIC_LIBS ON )
 find_package(PythonLibs)
-find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
+if( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+  find_package( Boost REQUIRED COMPONENTS thread system filesystem python2.7 )
+else( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+  find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
+endif()
 MESSAGE( STATUS "found boost:"
 "\nINCLUDE: ${Boost_INCLUDE_DIRS}"
 "\nLIB: ${Boost_LIBRARIES}"

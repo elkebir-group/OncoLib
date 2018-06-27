@@ -48,7 +48,6 @@ In case CMake fails to detect any of the above libraries, run the following comm
 
     $ cmake .. -DCMAKE_PREFIX_PATH=/data/work/yunan/subclone/software/armadillo-8.500.1/build \
     	-DLIBLEMON_ROOT=/data/work/yunan/subclone/software/lemon-1.3.1/build \
-    	-DBOOST_LIBRARYDIR=/data/work/yunan/software/anaconda3/lib/ \
     	-DBOOST_ROOT=/data/work/yunan/software/anaconda3/include/boost \
     	-DPYTHON_INCLUDE_DIR=/data/work/yunan/software/anaconda3/include/python3.6m \
     	-DPYTHON_LIBRARY=/data/work/yunan/software/anaconda3/lib
