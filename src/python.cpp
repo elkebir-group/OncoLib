@@ -995,7 +995,7 @@ std::string visualizeEnumeratedCloneTree(const std::string& filenameInFreqs,
         {
           for (int p = 0; p < F.getNrSamples(); ++p)
           {
-            ssOut << "\\n" << F.min(p, F.characterToIndex(label_v));
+            ssOut << "\\n" << F.min(p, F.characterToIndex(label_v)) << " " << F.max(p, F.characterToIndex(label_v));
           }
         }
         
