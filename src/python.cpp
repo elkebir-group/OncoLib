@@ -9,6 +9,7 @@
 #include <boost/python.hpp>
 #include <boost/python/def.hpp>
 #include <boost/python/args.hpp>
+#include <boost/python/stl_iterator.hpp>
 #include <armadillo>
 #include <iostream>
 #include <fstream>
