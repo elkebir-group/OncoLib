@@ -99,29 +99,37 @@ FrequencyMatrix ReadMatrix::toFrequencyMatrix(double alpha,
       int var = getVar(p, i);
       int ref = getRef(p, i);
       
-      boost::math::beta_distribution<> beta_dist(1 + var, 1 + ref);
-      
-      double f_lb = boost::math::quantile(beta_dist, alpha / 2);
-      double f_ub = boost::math::quantile(beta_dist, 1 - alpha / 2);
-      
-      if (var < threshold || var <= (var + ref) * 0.01)
+      if (alpha < 0)
       {
-        f_lb = f_ub = 0;
+        double vaf = (double)var / double(var + ref);
+        resF.set(p, i, vaf, vaf);
       }
-      
-//      f_lb *= 2;
-//      f_ub *= 2;
-      
-      if (f_lb > 1)
+      else
       {
-        f_lb = 1;
+        boost::math::beta_distribution<> beta_dist(1 + var, 1 + ref);
+        
+        double f_lb = boost::math::quantile(beta_dist, alpha / 2);
+        double f_ub = boost::math::quantile(beta_dist, 1 - alpha / 2);
+        
+        if (var < threshold || var <= (var + ref) * 0.01)
+        {
+          f_lb = f_ub = 0;
+        }
+        
+  //      f_lb *= 2;
+  //      f_ub *= 2;
+        
+        if (f_lb > 1)
+        {
+          f_lb = 1;
+        }
+        if (f_ub > 1)
+        {
+          f_ub = 1;
+        }
+        
+        resF.set(p, i, f_lb, f_ub);
       }
-      if (f_ub > 1)
-      {
-        f_ub = 1;
-      }
-      
-      resF.set(p, i, f_lb, f_ub);
     }
   }
   
