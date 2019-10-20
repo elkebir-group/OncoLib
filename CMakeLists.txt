@@ -308,9 +308,9 @@ set( enumerate_src
 )
 
 # first we can indicate the documentation build as an option and set it to ON by default
-option(BUILD_DOC "Build documentation" ON)
+option(BUILD_DOC "Build documentation" OFF)
 
-if (CMAKE_BUILD_TYPE MATCHES "^[Rr]elease")
+if (CMAKE_BUILD_TYPE MATCHES "^[Rr]elease" AND BUILD_DOC)
   # check if Doxygen is installed
   find_package(Doxygen)
   if (DOXYGEN_FOUND)
@@ -353,20 +353,26 @@ execute_process( COMMAND git log --pretty=format:%h WORKING_DIRECTORY ${PROJECT_
 COMMAND head -n 1  COMMAND tr -d "\\n" OUTPUT_VARIABLE GitHashtag )
 
 #set( Boost_USE_STATIC_LIBS ON )
-find_package(PythonLibs)
-if( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
-  find_package( Boost REQUIRED COMPONENTS thread system filesystem python2.7 )
-else( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
-  find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
+#find_package(PythonLibs)
+if (PYTHON)
+  FIND_PACKAGE(PythonInterp REQUIRED)
+  FIND_PACKAGE(PythonLibsNew REQUIRED)
+  if( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+    #find_package( Boost REQUIRED COMPONENTS thread system filesystem python2.7 )
+    find_package( Boost REQUIRED COMPONENTS thread system filesystem python2.7 )
+  else( ${CMAKE_SYSTEM_NAME} MATCHES "Darwin" )
+    #find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
+    find_package( Boost REQUIRED COMPONENTS thread system filesystem python )
+  endif()
+else()
+    find_package( Boost REQUIRED COMPONENTS thread system filesystem )
 endif()
 MESSAGE( STATUS "found boost:"
 "\nINCLUDE: ${Boost_INCLUDE_DIRS}"
 "\nLIB: ${Boost_LIBRARIES}"
 )
 
-FIND_PACKAGE(PythonInterp REQUIRED)
-FIND_PACKAGE(PythonLibsNew REQUIRED)
-FIND_PACKAGE(Armadillo REQUIRED)
+#FIND_PACKAGE(Armadillo REQUIRED)
 
 include_directories( "${LIBLEMON_ROOT}/include" "src" ${Boost_INCLUDE_DIRS} )
 link_directories( "${LIBLEMON_ROOT}/lib" )
@@ -378,7 +384,7 @@ ADD_EXECUTABLE(${_name} ${_srccpp} ${python_mod_src} ${python_mod_hdr} )
 TARGET_INCLUDE_DIRECTORIES(${_name} PUBLIC "${PROJECT_SOURCE_DIR}/src" ${PYTHON_INCLUDE_DIRS} ${Boost_INCLUDE_DIRS} ${GUROBI_INCLUDE_DIR} ${ARMADILLO_INCLUDE_DIRS})
 TARGET_LINK_LIBRARIES(${_name} ${CommonLibs} boost_python2.7)
 ENDMACRO()
-
+#
 MACRO( addPythonMod _name _srccpp )
 PYTHON_ADD_MODULE(${_name} ${_srccpp} ${python_mod_src} ${python_mod_hdr} )
 # make the pyd library link against boost_numpy python and boost
@@ -391,7 +397,7 @@ set( CommonLibs
   pthread
   emon
   ${Boost_LIBRARIES}
-  ${ARMADILLO_LIBRARIES}
+  #  ${ARMADILLO_LIBRARIES}
 )
 
 set( CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -DDEBUG" )
@@ -429,4 +435,6 @@ target_link_libraries( enumerate ${CommonLibs} )
 add_executable( precluster ${precluster_src} ${precluster_hdr} )
 target_link_libraries( precluster ${CommonLibs} )
 
-addPythonMod( oncolib src/python.cpp )
+if (PYTHON)
+  addPythonMod( oncolib src/python.cpp )
+endif()
